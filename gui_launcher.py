@@ -10,7 +10,7 @@ app = Flask(__name__)
 @app.route('/')
 def home():
     """기본 홈페이지"""
-    return """
+    return '''
     <!DOCTYPE html>
     <html>
     <head>
@@ -47,7 +47,7 @@ def home():
         </div>
     </body>
     </html>
-    """
+    '''
 
 # 권한 제어 파일
 PERMISSION_FILE = "permission_control.json"
