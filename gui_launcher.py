@@ -6,6 +6,49 @@ from datetime import datetime
 
 app = Flask(__name__)
 
+# 기본 경로
+@app.route('/')
+def home():
+    """기본 홈페이지"""
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>부동산 매물 자동화 서비스</title>
+        <meta charset="utf-8">
+        <style>
+            body { font-family: Arial, sans-serif; margin: 40px; text-align: center; }
+            .container { max-width: 600px; margin: 0 auto; }
+            .btn { padding: 15px 30px; margin: 10px; font-size: 16px; text-decoration: none; 
+                   background-color: #4CAF50; color: white; border-radius: 5px; }
+            .btn:hover { background-color: #45a049; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🏠 부동산 매물 자동화 서비스</h1>
+            <p>서비스가 정상적으로 실행 중입니다.</p>
+            
+            <h3>📋 사용 가능한 기능</h3>
+            <p><a href="/admin" class="btn">🎛️ 관리자 패널</a></p>
+            <p><a href="/check_permission" class="btn">🔐 권한 확인</a></p>
+            
+            <h3>📡 API 엔드포인트</h3>
+            <ul style="text-align: left;">
+                <li><strong>GET /check_permission</strong> - 클라이언트 권한 확인</li>
+                <li><strong>POST /control_permission</strong> - 권한 제어 (관리자용)</li>
+                <li><strong>GET /admin</strong> - 관리자 웹 패널</li>
+                <li><strong>GET /run_almostdone</strong> - almostdone.py 실행</li>
+                <li><strong>GET /run_analyzefinal</strong> - analyzefinal.py 실행</li>
+                <li><strong>GET /check_txt_file</strong> - TXT 파일 확인</li>
+            </ul>
+            
+            <p><small>🚀 Powered by Flask & Render</small></p>
+        </div>
+    </body>
+    </html>
+    """
+
 # 권한 제어 파일
 PERMISSION_FILE = "permission_control.json"
 
