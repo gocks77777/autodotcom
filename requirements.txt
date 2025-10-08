@@ -16,5 +16,8 @@ chardet>=5.0.0
 openpyxl>=3.1.0
 xlrd>=2.0.0
 
+# HTTP 요청 (권한 확인용)
+requests>=2.25.0
+
 # 실행 파일 생성용 (선택사항)
 pyinstaller>=6.0.0

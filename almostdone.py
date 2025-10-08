@@ -19,30 +19,187 @@ import tempfile
 from webdriver_manager.chrome import ChromeDriverManager
 import chardet
 from selenium.webdriver.common.keys import Keys
+import json
+import shutil
+import requests
+
+# 설정 파일 관리
+CONFIG_FILE = "config.json"
+
+def load_config():
+    """설정 파일을 읽어옵니다."""
+    try:
+        if os.path.exists(CONFIG_FILE):
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+                print("✅ 기존 설정 파일을 로드했습니다.")
+                return config
+    except Exception as e:
+        print(f"⚠️ 설정 파일 읽기 오류: {e}")
+    
+    return None
+
+def save_config(config):
+    """설정을 파일에 저장합니다."""
+    try:
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(config, f, indent=4, ensure_ascii=False)
+        print("✅ 설정이 저장되었습니다.")
+        return True
+    except Exception as e:
+        print(f"❌ 설정 저장 오류: {e}")
+        return False
+
+def create_default_config():
+    """기본 설정을 생성합니다."""
+    chrome_path = find_chrome_path()
+    
+    config = {
+        "chrome_path": chrome_path,
+        "data_folder": "./data",
+        "temp_folder": "./temp",
+        "server_url": "https://autodotcom.onrender.com",
+        "auto_setup_completed": chrome_path is not None,
+        "version": "1.0"
+    }
+    
+    return config
+
+def setup_initial_config():
+    """초기 설정을 수행합니다."""
+    print("=" * 50)
+    print("🚀 초기 설정을 시작합니다...")
+    print("=" * 50)
+    
+    config = create_default_config()
+    
+    # Chrome 경로 확인
+    if not config["chrome_path"]:
+        print("\n❌ Chrome을 자동으로 찾을 수 없습니다.")
+        print("Chrome이 설치되어 있는지 확인해주세요.")
+        print("Google Chrome 다운로드: https://www.google.com/chrome/")
+        input("\nChrome 설치 후 Enter 키를 눌러주세요...")
+        
+        # 다시 시도
+        config["chrome_path"] = find_chrome_path()
+        if not config["chrome_path"]:
+            print("❌ Chrome을 찾을 수 없어 설정을 완료할 수 없습니다.")
+            return None
+    
+    # 폴더 생성
+    for folder_key in ["data_folder", "temp_folder"]:
+        folder_path = config[folder_key]
+        try:
+            os.makedirs(folder_path, exist_ok=True)
+            print(f"✅ {folder_key} 폴더 생성: {folder_path}")
+        except Exception as e:
+            print(f"⚠️ {folder_key} 폴더 생성 실패: {e}")
+    
+    # 설정 저장
+    if save_config(config):
+        print("\n🎉 초기 설정이 완료되었습니다!")
+        print("다음부터는 자동으로 실행됩니다.")
+        return config
+    else:
+        print("\n❌ 설정 저장에 실패했습니다.")
+        return None
+
+def check_server_permission(server_url="https://autodotcom.onrender.com"):
+    """서버에서 프로그램 실행 권한을 확인합니다."""
+    try:
+        print("🔐 서버 권한 확인 중...")
+        response = requests.get(f"{server_url}/check_permission", timeout=10)
+        
+        if response.status_code == 200:
+            permission_data = response.json()
+            
+            if permission_data.get("enabled", False):
+                print(f"✅ 권한 확인 완료: {permission_data.get('message', '사용 허가됨')}")
+                return True
+            else:
+                print(f"❌ 사용 권한이 없습니다: {permission_data.get('message', '사용 금지됨')}")
+                print(f"📅 마지막 업데이트: {permission_data.get('last_updated', 'N/A')}")
+                return False
+        else:
+            print(f"⚠️ 서버 응답 오류 (코드: {response.status_code})")
+            return False
+            
+    except requests.exceptions.Timeout:
+        print("⚠️ 서버 연결 시간 초과 - 오프라인 모드로 실행합니다.")
+        return True  # 서버 연결 실패 시 허용 (오프라인 사용)
+    except requests.exceptions.ConnectionError:
+        print("⚠️ 서버에 연결할 수 없습니다 - 오프라인 모드로 실행합니다.")
+        return True  # 서버 연결 실패 시 허용 (오프라인 사용)
+    except Exception as e:
+        print(f"⚠️ 권한 확인 중 오류 발생: {e}")
+        return True  # 오류 시 허용 (기본값)
 
 # Chrome 디버깅 모드로 실행
 
-def start_chrome_with_debugging():
-    print("DEBUG: Starting Chrome with debugging mode...")
+def find_chrome_path():
+    """Chrome 실행 파일 경로를 자동으로 찾습니다."""
+    print("🔍 Chrome 설치 경로를 찾는 중...")
+    
     if platform.system() == "Windows":
-        program_files = os.getenv("ProgramFiles", r"C:\\Program Files")
-        program_files_x86 = os.getenv("ProgramFiles(x86)", r"C:\\Program Files (x86)")
+        # Windows에서 가능한 Chrome 설치 경로들
         possible_paths = [
-            os.path.join(program_files, "Google", "Chrome", "Application", "chrome.exe"),
-            os.path.join(program_files_x86, "Google", "Chrome", "Application", "chrome.exe")
+            # Program Files 경로들
+            os.path.join(os.getenv("ProgramFiles", r"C:\Program Files"), "Google", "Chrome", "Application", "chrome.exe"),
+            os.path.join(os.getenv("ProgramFiles(x86)", r"C:\Program Files (x86)"), "Google", "Chrome", "Application", "chrome.exe"),
+            # 사용자별 설치 경로들
+            os.path.join(os.getenv("LOCALAPPDATA", r"C:\Users\%USERNAME%\AppData\Local"), "Google", "Chrome", "Application", "chrome.exe"),
+            # 기타 가능한 경로들
+            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+            r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+            # 사용자 홈 디렉토리
+            os.path.expanduser("~\\AppData\\Local\\Google\\Chrome\\Application\\chrome.exe"),
+        ]
+        
+        for path in possible_paths:
+            if os.path.exists(path):
+                print(f"✅ Chrome 발견: {path}")
+                return path
+                
+        print("❌ Chrome을 자동으로 찾을 수 없습니다.")
+        return None
+        
+    elif platform.system() == "Darwin":  # macOS
+        possible_paths = [
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+            "/System/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
         ]
         for path in possible_paths:
             if os.path.exists(path):
-                chrome_path = path
-                break
-        else:
-            chrome_path = input("Chrome 실행 파일 경로를 입력하세요: ")
-    elif platform.system() == "Darwin":
-        chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+                print(f"✅ Chrome 발견: {path}")
+                return path
+        print("❌ Chrome을 자동으로 찾을 수 없습니다.")
+        return None
+        
     elif platform.system() == "Linux":
-        chrome_path = "/usr/bin/google-chrome"
+        possible_paths = [
+            "/usr/bin/google-chrome",
+            "/usr/bin/google-chrome-stable",
+            "/usr/bin/chromium-browser",
+            "/snap/bin/chromium",
+        ]
+        for path in possible_paths:
+            if os.path.exists(path):
+                print(f"✅ Chrome 발견: {path}")
+                return path
+        print("❌ Chrome을 자동으로 찾을 수 없습니다.")
+        return None
     else:
         print("⚠️ 지원되지 않는 운영체제입니다.")
+        return None
+
+def start_chrome_with_debugging(config):
+    print("🌐 Chrome 디버깅 모드로 시작...")
+    chrome_path = config.get("chrome_path")
+    
+    if not chrome_path or not os.path.exists(chrome_path):
+        print("❌ Chrome 경로가 유효하지 않습니다.")
+        print("설정을 다시 확인해주세요.")
+        input("Enter 키를 눌러 종료...")
         exit()
 
     user_data_dir = os.path.join(tempfile.gettempdir(), "ChromeProfile")
@@ -671,7 +828,33 @@ def extract_listings_from_txt(txt_path, encoding):
         exit()
 
 if __name__ == "__main__":
-    start_chrome_with_debugging()
+    print("🚀 부동산 매물 자동화 프로그램 시작")
+    print("=" * 50)
+    
+    # 1단계: 서버 권한 확인
+    if not check_server_permission():
+        print("\n" + "=" * 50)
+        print("❌ 프로그램 실행이 차단되었습니다.")
+        print("관리자에게 문의하거나 잠시 후 다시 시도해주세요.")
+        print("=" * 50)
+        input("\nEnter 키를 눌러 종료...")
+        exit(1)
+    
+    # 2단계: 설정 로드 또는 초기 설정
+    config = load_config()
+    if not config or not config.get("auto_setup_completed", False):
+        print("초기 설정이 필요합니다.")
+        config = setup_initial_config()
+        if not config:
+            print("❌ 설정 실패로 프로그램을 종료합니다.")
+            input("Enter 키를 눌러 종료...")
+            exit(1)
+    
+    print(f"✅ Chrome 경로: {config['chrome_path']}")
+    print(f"✅ 데이터 폴더: {config['data_folder']}")
+    print("=" * 50)
+    
+    start_chrome_with_debugging(config)
     time.sleep(5)
 
     root = tkinter.Tk()
@@ -700,9 +883,36 @@ if __name__ == "__main__":
         chrome_options.add_experimental_option("debuggerAddress","127.0.0.1:9222")
         
         print("브라우저 연결 시도 중...")
-        # ChromeDriver 없이 직접 연결 시도
-        driver = webdriver.Chrome(options=chrome_options)
-        print("✓ 브라우저 연결 성공")
+        
+        # ChromeDriver 설정 (기본 방식 우선)
+        driver = None
+        print("브라우저 드라이버 설정 중...")
+        
+        # 1차 시도: 기본 방식 (가장 안정적)
+        try:
+            driver = webdriver.Chrome(options=chrome_options)
+            print("✓ 브라우저 연결 성공 (기본 방식)")
+        except Exception as e1:
+            print(f"⚠️ 기본 방식 실패: {e1}")
+            print("ChromeDriver 자동 설치 시도...")
+            
+            # 2차 시도: ChromeDriver 자동 설치
+            try:
+                from selenium.webdriver.chrome.service import Service
+                driver_path = ChromeDriverManager().install()
+                print(f"ChromeDriver 자동 설치 완료: {driver_path}")
+                
+                service = Service(driver_path)
+                driver = webdriver.Chrome(service=service, options=chrome_options)
+                print("✓ 브라우저 연결 성공 (ChromeDriver 자동 설치)")
+                
+            except Exception as e2:
+                print(f"❌ ChromeDriver 자동 설치도 실패: {e2}")
+                print("\n해결 방법:")
+                print("1. Chrome 브라우저가 설치되어 있는지 확인")
+                print("2. Chrome 버전과 호환되는 ChromeDriver 수동 설치")
+                print("3. 시스템 PATH에 ChromeDriver 경로 추가")
+                raise Exception("브라우저 연결에 실패했습니다.")
         
         # '시작'을 입력하여 자동화를 시작
         user_input = input("'시작'을 입력하여 자동화를 시작하세요: ")

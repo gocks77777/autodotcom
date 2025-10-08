@@ -1,0 +1,8 @@
+{
+    "chrome_path": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "data_folder": "./data",
+    "temp_folder": "./temp",
+    "server_url": "https://autodotcom.onrender.com",
+    "auto_setup_completed": true,
+    "version": "1.0"
+}

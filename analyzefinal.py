@@ -1,8 +1,6 @@
 import os
 import pandas as pd
 from datetime import datetime
-from tkinter import Tk
-from tkinter.filedialog import askopenfilename
 from collections import defaultdict
 
 def process_data(df):
@@ -87,17 +85,17 @@ def format_output_item(number, item_data):
 
 
 def analyze_excel_and_save(excel_path=None):
-    """엑셀 파일 분석 및 메모장 저장 (수정 없음)"""
+    """엑셀 파일 분석 및 메모장 저장 (서버 환경 대응)"""
     try:
-        Tk().withdraw()
+        # 서버 환경에서는 현재 디렉토리의 엑셀 파일을 찾아서 처리
         if not excel_path:
-            excel_path = askopenfilename(
-                title="엑셀 파일 선택",
-                filetypes=[("Excel 파일", "*.xlsx")]
-            )
-            if not excel_path:
-                print("파일 선택 취소")
+            # 현재 디렉토리에서 .xlsx 파일 찾기
+            excel_files = [f for f in os.listdir('.') if f.endswith('.xlsx')]
+            if not excel_files:
+                print("❌ 현재 디렉토리에 엑셀 파일(.xlsx)이 없습니다.")
                 return None
+            excel_path = excel_files[0]  # 첫 번째 엑셀 파일 사용
+            print(f"📄 찾은 엑셀 파일: {excel_path}")
 
         # 엑셀 파일 읽기 (헤더=2행, 수정 없음)
         df = pd.read_excel(excel_path, header=1)
@@ -119,10 +117,9 @@ def analyze_excel_and_save(excel_path=None):
         # 데이터 처리 (process_data 함수 호출, 수정 없음)
         result = process_data(df)
 
-        # 파일 저장 (수정 없음)
-        desktop = os.path.join(os.environ['USERPROFILE'], 'Desktop')
+        # 파일 저장 (서버 환경에 맞게 수정)
         filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
-        output_path = os.path.join(desktop, filename)
+        output_path = os.path.join('.', filename)  # 현재 디렉토리에 저장
 
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write("\n\n".join(result))  # 항목 간 2줄 띄움
